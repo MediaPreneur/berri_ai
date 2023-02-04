@@ -40,6 +40,7 @@ Once deployment is complete, you will receive an email notification. The entire 
 
 1. [Berri LangChain Youtube Agent Example](https://colab.research.google.com/drive/1Do4Utp4crMSpPngDlZOXx30HFmKhtxIF?usp=sharing)
 2. [Berri LangChain Search Agent Example](https://colab.research.google.com/drive/1cB-QfCaKBs2Npe58R60qf-II0wcsT6VQ?usp=sharing)
+3. [Berri GPT Index + Langchain Document QA Example](https://colab.research.google.com/drive/1R4e4dd-qr4XxPbOGdAIj0ybtliSlO4Zm?usp=sharing)
 
 ## 🚨 Support
 
