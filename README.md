@@ -21,7 +21,7 @@ There are 3 major ways you can use Berri
 
 ### 👷 Pipelines
 
-Today we support just 1 pipeline - `docQAPipeline`: This lets you paste a url link to your documentation and get a shareable web app to use it, in 15mins. We'll handle the chunking, vectorizing, agent initialization, deployment for you.
+Today we support 1 pipeline - `docQAPipeline`: This lets you paste a url link to your documentation and get a shareable web app to use it, in 15mins. We'll handle the chunking, vectorizing, agent initialization, deployment for you.
 
 1. Install the package:
 
