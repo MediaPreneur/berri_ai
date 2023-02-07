@@ -1,4 +1,4 @@
-__version__ = '0.14.1'
+__version__ = '0.15.0'
 import ast 
 import re
 import os 
@@ -9,8 +9,8 @@ import subprocess
 import requests
 import shutil 
 
-def send_files(user_email):
-    url = f'https://berriserverv2.krrishdholakia.repl.co/berri_orchestrator?user_email={user_email}'
+def send_files(user_email, template_name):
+    url = f'https://berriserverv2.krrishdholakia.repl.co/berri_orchestrator?user_email={user_email}&template_name={template_name}'
     files_list = []
     
     for file in os.listdir("./berri_files"):
@@ -98,7 +98,10 @@ def get_dependencies(code_segment_list, global_dict):
     dep_modules = None
     # print("new list")
     bool_val = True
+    i = 0
     while bool_val:
+      if i >= 20:
+        raise Exception("there is an issue in the loop")
       # print("in while loop")
       dep_modules = []
       try:
@@ -242,6 +245,153 @@ def get_requirements(line):
 #           line = re.sub(r'"([^"]*)"', '"' + new_filepath + '"', line)     
 #   return line 
 
+def docQAPipeline(user_email: str, open_ai_key: str, input_url: str):
+  from gpt_index import SimpleWebPageReader, GPTSimpleVectorIndex, PromptHelper
+  import os
+  try:
+    print("Begun deployment..")
+    print("🚨 Hit an error? let us know in the Discord (https://discord.gg/KvG3azf39U).")
+    print("🐍 Chunking + Vectorizing + Storing your url data, this might take 1-2 minutes.")
+    os.environ["OPENAI_API_KEY"] = open_ai_key
+    # set maximum input size
+    max_input_size = 4096
+    # set number of output tokens
+    num_output = 256
+    # set maximum chunk overlap
+    max_chunk_overlap = 20
+    prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
+    documents = SimpleWebPageReader(html_to_text=True).load_data([input_url])
+    index = GPTSimpleVectorIndex(documents, prompt_helper=prompt_helper)
+    if not os.path.exists('./berri_files/'):
+      os.mkdir("./berri_files/")
+    index.save_to_disk("./berri_files/doc_qa.json")
+    endpoint = "https://" + send_files(user_email, "berri_backend_pipeline_server_template")
+    print("🚧 Currently deploying to [NOT READY YET] 👉 " + endpoint)
+    print("⌛️ It'll be ready in 15 mins. We'll email you  @ " + user_email)
+  except Exception as e: 
+    print(e)
+    traceback.print_exc()
+    print("🚨🚨 Deployment Error 📣: There was an error deploying your project. Join us on Discord (https://discord.gg/KvG3azf39U) and we'll fix this for you.")
+  print("=====================")
+  print("Got feedback? Text/WhatsApp us 👉 +17708783106")
+
+
+def deploy_gpt_index(user_email: str):
+  from google.colab import _message
+  try:
+    print("Begun deployment..")
+    print("🚨 Hit an error? let us know in the Discord (https://discord.gg/KvG3azf39U).")
+    print("🐍 Converting notebook to python and generating requirements.txt, this might take 1-2 minutes.")
+    # assume you're in a google colab 
+    if not os.path.exists('./berri_files/'):
+      os.mkdir("./berri_files/")
+
+    copy_files() # copies all local non-drive/sample_data files and folders into berri_files
+
+    # Obtain the notebook JSON as a string
+    notebook_json_string = _message.blocking_request('get_ipynb', request='', timeout_sec=5)
+
+    # save to temporary file
+    lines = []
+    requirements = []
+    for cell in notebook_json_string["ipynb"]["cells"]:
+      if cell["cell_type"] == "code":
+        for line in cell["source"]:
+          if line.startswith("!pip install"):
+            requirements.append(get_requirements(line))
+            # continue
+          elif not line.startswith("!"):
+            lines.append(line)
+    
+    f = open("./berri_files/agent_code.py", "w")
+    for line in lines:
+      if ".query(" in line:
+        # print("line where query was found: ", line)
+        # get the variable name
+        initialization_line = line.split("=", 1)
+        original_agent_name = initialization_line[0].strip() # get the original agent variable name
+        # print("original_agent_name: ", original_agent_name)
+        # replace with new name 
+        prev_name = initialization_line[1].split(".query")[0].strip()
+        reinitialize_agent = "agent = " + prev_name
+        f.write(reinitialize_agent + "\n")
+        line = initialization_line[1].replace(prev_name, "agent").strip()
+        # print(initialization_line)
+        f.write(line + "\n")
+      else:
+        # line = read_file_copy_drive_files(line)
+        f.write(line + "\n")
+    f.close()
+    
+    # save the requirements to a requirements.txt file 
+    save_requirements("./berri_files", requirements)
+
+    with open("./berri_files/agent_code.py") as f:
+        lines = f.readlines()
+    
+    with open("./berri_files/agent_code.py") as f:
+        code = f.read()
+
+    tree = ast.parse(code)
+    tree_dict = {}
+    global_dict = {}
+    # traverse the file and create a dictionary
+    traverse_ast(tree_dict, code, tree, global_dict)
+    # print("global_dict: ", global_dict)
+    # print("tree_dict: ", tree_dict)
+
+    # find the executing line
+    agent_executing_line = "agent.query("
+    # find the import statements
+    import_statements = []
+    for line in lines:
+      if agent_executing_line in line:
+        # print(line)
+        agent_executing_line = line.strip() # find the executing line 
+        print("agent_executing_line: ", agent_executing_line)
+      elif "google.colab" in line or "drive.mount('/content/drive')" in line:
+        continue
+      elif "import" in line:
+        import_statements.append(line)
+
+    # run_loop(import_statements, tree_dict, global_dict)
+    # print(import_statements)
+
+    parent_dependencies = []
+    
+    for key in tree_dict:
+      if "os" in key:
+        parent_dependencies.append(tree_dict[key])
+    
+    # print("parent_dependencies: ", parent_dependencies)
+    
+    parent_dependencies = run_loop(import_statements, parent_dependencies, tree_dict, global_dict)
+
+    # print("updated parent dependencies: ", parent_dependencies)
+        
+    implementation_code = [agent_executing_line]
+    environment_setup_list = import_statements + parent_dependencies
+    # print("running main code now")
+    all_up_code = run_loop(environment_setup_list, implementation_code, tree_dict, global_dict)
+
+    # print("all_up_code: ", all_up_code)
+
+    with open("./berri_files/agent_code.py", "w") as f:
+      for code_segment in all_up_code:
+        f.write(code_segment + "\n")
+
+    print("😱 Building docker image.. this might take 1-2 minutes")
+    endpoint = "https://" + send_files(user_email, "berri_backend_server_template")
+
+    print("🚧 Currently deploying to [NOT READY YET] 👉 " + endpoint)
+    print("⌛️ It'll be ready in 15 mins. We'll email you  @ " + user_email)
+  except Exception as e:
+    print(e)
+    traceback.print_exc()
+    print("🚨🚨 Deployment Error 📣: There was an error deploying your project. Join us on Discord (https://discord.gg/KvG3azf39U) and we'll fix this for you.")
+  print("=====================")
+  print("Got feedback? Text/WhatsApp us 👉 +17708783106")
+
 def deploy(user_email: str):
   from google.colab import _message
   try:
@@ -353,13 +503,13 @@ def deploy(user_email: str):
         f.write(code_segment + "\n")
 
     print("😱 Building docker image.. this might take 1-2 minutes")
-    endpoint = "https://" + send_files(user_email)
+    endpoint = "https://" + send_files(user_email, "berri_backend_server_template")
 
     print("🚧 Currently deploying to [NOT READY YET] 👉 " + endpoint)
     print("⌛️ It'll be ready in 15 mins. We'll email you  @ " + user_email)
   except Exception as e:
-    # print(e)
-    # traceback.print_exc()
+    print(e)
+    traceback.print_exc()
     print("🚨🚨 Deployment Error 📣: There was an error deploying your project. Join us on Discord (https://discord.gg/KvG3azf39U) and we'll fix this for you.")
   print("=====================")
   print("Got feedback? Text/WhatsApp us 👉 +17708783106")
