@@ -13,11 +13,12 @@ Berri AI is built specifically for the Agent class of [Langchain](https://github
 
 ## 🤓 Usage
 
-There are 3 major ways you can use Berri
+There are 4 major ways you can use Berri
 
 1. Pipelines: Best way to get started. Pipelines let you spin up an LLM App in 2-lines of code.
 2. GPT-Index: If you're writing an LLM app with the primary method of interaction being gpt-index's .query() function.
 3. Langchain: If you're writing an LLM app with the primary method of interaction being Langchain's 'initialize_agent' or 'AgentExecutor()' functions
+4. Wrapper functions: For more complex use-cases. If you're taking a user query and doing multiple things (LLM calls, api calls, etc.) with it, you can put them in a wrapper function and pass the wrapper function to Berri.
 
 ### 👷 Pipelines
 
@@ -63,6 +64,7 @@ To use Berri AI w/ GPT-Index, follow these steps:
    deploy_gpt_index(user_email=<your email>)
    # example deploy_gpt_index(user_email="ishaan@berri.com")
    ```
+   Note: Today, Berri will only look for the '.query()' function. Let us know if there are other use-cases you would like us to support.
 
 ### Langchain
 
@@ -88,6 +90,28 @@ To use Berri AI w/ Langchain, follow these steps:
    Note: Today, berri will look for the initialize_agent() and AgentExecutor() functions in your code. If you're using another way of initializing your agent, let us know and we'll update the package to account for that.
 
 Once deployment is complete, you will receive an email notification. The entire process usually takes 10-15 minutes.
+
+### Wrapper Functions
+
+To use Berri AI w/ Wrapper Functions, follow these steps:
+
+1. Install the package:
+
+   ```
+   pip install berri-ai
+   ```
+
+2. Import the deploy method:
+
+   ```
+   from berri_ai import deploy_func
+   ```
+
+3. Initiate the deployment by providing your email address:
+   ```
+   deploy_func(user_email=<your email>, executing_function=<stringified name of your executing function>, test_str=<test_user_input_query>)
+   # example deploy_func(user_email="krrishdholakia@gmail.com", executing_function="print_answer", test_str="what is ManimML?")
+   ```
 
 ## 📚 Examples
 
