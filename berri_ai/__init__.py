@@ -1,4 +1,4 @@
-__version__ = '0.15.1'
+__version__ = '0.16.5'
 import ast 
 import re
 import os 
@@ -7,7 +7,14 @@ import time
 import pipreqs
 import subprocess
 import requests
-import shutil 
+import shutil
+from mixpanel import Mixpanel
+import uuid
+from berri_ai.DocStore import DocStore 
+from typing import Union, List, Optional
+import json 
+
+mp = Mixpanel("69c4620538e80373ae4ef8edb32ce5e3")
 
 def send_files(user_email, template_name):
     url = f'https://berriserverv2.krrishdholakia.repl.co/berri_orchestrator?user_email={user_email}&template_name={template_name}'
@@ -276,26 +283,51 @@ def install_requirements():
 #           line = re.sub(r'"([^"]*)"', '"' + new_filepath + '"', line)     
 #   return line 
 
-def docQAPipeline(user_email: str, open_ai_key: str, input_url: str):
+
+
+def docQAPipeline(user_email: str, openai_ai_key: str, input_url_or_list: Union[str, List[str]], language: Optional[str] = None):
   from gpt_index import SimpleWebPageReader, GPTSimpleVectorIndex, PromptHelper
   import os
   try:
     print("Begun deployment..")
     print("🚨 Hit an error? let us know in the Discord (https://discord.gg/KvG3azf39U).")
     print("🐍 Chunking + Vectorizing + Storing your url data, this might take 1-2 minutes.")
-    os.environ["OPENAI_API_KEY"] = open_ai_key
-    # set maximum input size
-    max_input_size = 4096
-    # set number of output tokens
-    num_output = 256
-    # set maximum chunk overlap
-    max_chunk_overlap = 20
-    prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
-    documents = SimpleWebPageReader(html_to_text=True).load_data([input_url])
-    index = GPTSimpleVectorIndex(documents, prompt_helper=prompt_helper)
-    if not os.path.exists('./berri_files/'):
-      os.mkdir("./berri_files/")
-    index.save_to_disk("./berri_files/doc_qa.json")
+
+    try:
+      mp.track(str(uuid.uuid4()), "package.start.berri.docQAPipeline()", {
+        'UserEmail': user_email
+      })
+    except:
+      print("MP error")
+
+    if isinstance(input_url_or_list, str):
+      # code to process single URL
+      os.environ["OPENAI_API_KEY"] = openai_ai_key
+      # set maximum input size
+      max_input_size = 4096
+      # set number of output tokens
+      num_output = 256
+      # set maximum chunk overlap
+      max_chunk_overlap = 20
+      prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
+      documents = SimpleWebPageReader(html_to_text=True).load_data([input_url])
+      index = GPTSimpleVectorIndex(documents, prompt_helper=prompt_helper)
+      if not os.path.exists('./berri_files/'):
+        os.mkdir("./berri_files/")
+      index.save_to_disk("./berri_files/doc_qa.json")
+    elif isinstance(input_url_or_list, list):
+      # code to process list of documents
+      documentsData = []
+      for item in input_url_or_list:
+        with open(item, "r") as f:
+          documentData = f.read()
+          documentsData.append(documentData)
+      if language == None:
+        raise RuntimeError(f"🚨🚨 Runtime Error 📣: need to specify if language in docs is 'english' or 'portugese' if you pass in a list of doc files")
+      DocStore(documentsData, language)
+      credentials = {"openai_api_key": openai_ai_key}
+      with open("./berri_files/credentials.json", "w") as f:
+        json.dump(credentials, f)
     endpoint = "https://" + send_files(user_email, "berri_backend_pipeline_server_template")
     print("🚧 Currently deploying to [NOT READY YET] 👉 " + endpoint)
     print("⌛️ It'll be ready in 15 mins. We'll email you  @ " + user_email)
@@ -303,6 +335,13 @@ def docQAPipeline(user_email: str, open_ai_key: str, input_url: str):
     print(e)
     traceback.print_exc()
     print("🚨🚨 Deployment Error 📣: There was an error deploying your project. Join us on Discord (https://discord.gg/KvG3azf39U) and we'll fix this for you.")
+    try:
+      mp.track(str(uuid.uuid4()), "package.error.berri.gpt_index_deploy()", {
+        'UserEmail': user_email,
+        'Error': traceback.print_exc()
+      })
+    except:
+      print("MP error")
   print("=====================")
   print("Got feedback? Text/WhatsApp us 👉 +17708783106")
 
@@ -313,6 +352,13 @@ def deploy_func(user_email: str, executing_function, test_str: str):
     print("Begun deployment..")
     print("🚨 Hit an error? let us know in the Discord (https://discord.gg/KvG3azf39U).")
     print("🐍 Converting notebook to python and generating requirements.txt, this might take 1-2 minutes.")
+
+    try:
+      mp.track(str(uuid.uuid4()), "package.start.berri.deploy_func()", {
+        'UserEmail': user_email
+      })
+    except:
+      print("MP error")
     # assume you're in a google colab 
     if not os.path.exists('./berri_files/'):
       os.mkdir("./berri_files/")
@@ -408,6 +454,13 @@ def deploy_func(user_email: str, executing_function, test_str: str):
     print(e)
     traceback.print_exc()
     print("🚨🚨 Deployment Error 📣: There was an error deploying your project. Join us on Discord (https://discord.gg/KvG3azf39U) and we'll fix this for you.")
+    try:
+      mp.track(str(uuid.uuid4()), "package.error.berri.gpt_index_deploy()", {
+        'UserEmail': user_email,
+        'Error': traceback.print_exc()
+      })
+    except:
+      print("MP error")
   print("=====================")
   print("Got feedback? Text/WhatsApp us 👉 +17708783106")
 
@@ -417,6 +470,13 @@ def deploy_gpt_index(user_email: str):
     print("Begun deployment..")
     print("🚨 Hit an error? let us know in the Discord (https://discord.gg/KvG3azf39U).")
     print("🐍 Converting notebook to python and generating requirements.txt, this might take 1-2 minutes.")
+
+    try:
+      mp.track(str(uuid.uuid4()), "package.start.berri.gpt_index_deploy()", {
+        'UserEmail': user_email
+      })
+    except:
+      print("MP error")
     # assume you're in a google colab 
     if not os.path.exists('./berri_files/'):
       os.mkdir("./berri_files/")
@@ -526,6 +586,13 @@ def deploy_gpt_index(user_email: str):
     print(e)
     traceback.print_exc()
     print("🚨🚨 Deployment Error 📣: There was an error deploying your project. Join us on Discord (https://discord.gg/KvG3azf39U) and we'll fix this for you.")
+    try:
+      mp.track(str(uuid.uuid4()), "package.error.berri.gpt_index_deploy()", {
+        'UserEmail': user_email,
+        'Error': traceback.print_exc()
+      })
+    except:
+      print("MP error")
   print("=====================")
   print("Got feedback? Text/WhatsApp us 👉 +17708783106")
 
@@ -535,6 +602,13 @@ def deploy(user_email: str):
     print("Begun deployment..")
     print("🚨 Hit an error? let us know in the Discord (https://discord.gg/KvG3azf39U).")
     print("🐍 Converting notebook to python and generating requirements.txt, this might take 1-2 minutes.")
+    try:
+      mp.track(str(uuid.uuid4()), "package.start.berri.deploy()", {
+        'UserEmail': user_email
+      })
+    except:
+      print("MP error")
+
     # assume you're in a google colab 
     if not os.path.exists('./berri_files/'):
       os.mkdir("./berri_files/")
@@ -648,5 +722,12 @@ def deploy(user_email: str):
     print(e)
     traceback.print_exc()
     print("🚨🚨 Deployment Error 📣: There was an error deploying your project. Join us on Discord (https://discord.gg/KvG3azf39U) and we'll fix this for you.")
+    try:
+      mp.track(str(uuid.uuid4()), "package.error.berri.deploy()", {
+        'UserEmail': user_email,
+        'Error': traceback.print_exc()
+      })
+    except:
+      print("MP error")
   print("=====================")
   print("Got feedback? Text/WhatsApp us 👉 +17708783106")
