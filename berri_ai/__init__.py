@@ -1,4 +1,4 @@
-__version__ = '0.16.5'
+__version__ = '0.16.7'
 import ast 
 import re
 import os 
@@ -32,16 +32,10 @@ def send_files(user_email, template_name):
 def traverse_ast(tree_dict, code, tree, global_dict):
   for node in tree.body:
       if isinstance(node, ast.With):
-        # print(dir(node.items[0]))
-        # print("ast.dump(node.items[0]) ", ast.dump(node.items[0]))
         node_value_source = ast.get_source_segment(code, node)
-        # print("ast.with value_source: ", node_value_source)
-        # print("node.body: ", node.body)
         for child in node.body: 
           if isinstance(child, ast.Assign):
             value_source = ast.get_source_segment(code, child)
-            # print("value of child node: ", value_source)
-            # print("value_source: ", value_source)
             str_split = value_source.split("=", 1)
             key_val = str(str_split[0]).strip()
             if key_val in tree_dict: 
@@ -52,7 +46,6 @@ def traverse_ast(tree_dict, code, tree, global_dict):
             tree_dict[key_val] = node_value_source
       if isinstance(node, ast.Assign):
         value_source = ast.get_source_segment(code, node)
-        # print("value_source: ", value_source)
         str_split = value_source.split("=", 1)
         key_val = str(str_split[0]).strip()
         value = str(str_split[1]).strip()
@@ -63,7 +56,6 @@ def traverse_ast(tree_dict, code, tree, global_dict):
             raise KeyError("🚨🚨 Deployment Error 📣: The variable - " + key_val + ' has been initialized 2 times. Here are the instances: \n 1.' + tree_dict[key_val][:100] + '\n 2.' + value_source[:100])
         tree_dict[key_val] = value_source
       elif isinstance(node, ast.ClassDef):
-          # print(node.name)
           key_val = node.name.strip()
           if key_val in tree_dict: 
             if ast.get_source_segment(code, node) == tree_dict[key_val]:
@@ -72,7 +64,6 @@ def traverse_ast(tree_dict, code, tree, global_dict):
               raise KeyError("🚨🚨 Deployment Error 📣: The variable - " + key_val + ' has been initialized 2 times. Here are the instances: \n 1.' + tree_dict[key_val][:100] + '\n 2.' + value_source[:100])
           tree_dict[key_val] = ast.get_source_segment(code, node)
       elif isinstance(node, ast.FunctionDef):
-          # print(node.name)
           key_val = node.name.strip()
           if key_val in tree_dict: 
             if ast.get_source_segment(code, node) == tree_dict[key_val]:
@@ -82,34 +73,17 @@ def traverse_ast(tree_dict, code, tree, global_dict):
           tree_dict[key_val] = ast.get_source_segment(code, node)
       elif isinstance(node, ast.Import):
           value_source = ast.get_source_segment(code, node)
-          # print("value_source in import: ", value_source)
           for name in node.names:
-            # print("name: ", name.name)
             key_val = name.name
-            # if key_val in tree_dict: 
-            #   if value_source == tree_dict[key_val]:
-            #     continue
-            #   else:
-            #     raise KeyError(key_val + ' already exists in the dictionary: ' + tree_dict[key_val] + ' | youre trying to set it to: ' + value_source)
             tree_dict[name.name] = value_source
             if "." in name.name:
               split_names = name.name.split(".")[0]
               key_val = split_names
-              # if key_val in tree_dict: 
-              #   if value_source == tree_dict[key_val]:
-              #     continue
-              #   else:
-              #     raise KeyError(key_val + ' already exists in the dictionary: ' + tree_dict[key_val] + ' | youre trying to set it to: ' + value_source)
               tree_dict[key_val] = value_source
       elif isinstance(node, ast.ImportFrom):
           value_source = ast.get_source_segment(code, node)
           for name in node.names:
             key_val = name.name
-            # if key_val in tree_dict: 
-            #   if value_source == tree_dict[key_val]:
-            #     continue
-            #   else:
-            #     raise KeyError(key_val + ' already exists in the dictionary: ' + tree_dict[key_val] + ' | youre trying to set it to: ' + value_source)
             tree_dict[name.name] = value_source
 
 def check_requirements(package):
@@ -122,19 +96,15 @@ def check_requirements(package):
 def get_dependencies(code_segment_list, global_dict):
     # Run function in a sandbox and catch ImportErrors
     dep_modules = None
-    # print("new list")
     bool_val = True
     i = 0
     while bool_val:
       if i >= 20:
         raise Exception("there is an issue in the loop")
-      # print("in while loop")
       dep_modules = []
       try:
         for code_segment in code_segment_list:
-          # exec(print(dir()))
           exec(code_segment, global_dict)
-          # func()  # Try to run function in the sandbox
         bool_val = False
       except ModuleNotFoundError as e:
         text = e.args[0]
@@ -142,38 +112,23 @@ def get_dependencies(code_segment_list, global_dict):
         if match:
             package_name = match.group(1)
             check_requirements(package_name)
-            # print("module not found in dep exec: ", package_name)
             install_statements = []
             install_statements.append("import subprocess")
             install_statements.append(str("""subprocess.call(['pip', 'install','""" + package_name + "'])"))
             for install_statement in install_statements:
               exec(install_statement)
-              # print("install_statement: ", install_statement)
-            # print("below module package install bool val: ", bool_val)
       except Exception as e:
-        # print(e)
-        # traceback.print_exc()
         if hasattr(e, 'name'):
-          # print("e.name: ", e.name)
           dep_modules.append(e.name)  # Add module that caused error
           bool_val = False
         else:
-            # print(e.args)
             text = e.args[0]
-            # print("text: ", text)
             pattern = r"pip install (\w+)"
-            # print(type(text))
-            # print(isinstance(text, list))
-            # print(len(text))
             if isinstance(text, list):
               text = str(text[0])
-              # print("text cleaned up: ", text)
             match = re.search(pattern, text)
             if match:
-              # print("validation error here")
               package_name = match.group(1)
-              # print("Package name to install:", package_name)
-              # print("below package install bool val: ", bool_val)
               install_statements = []
               install_statements.append("import subprocess")
               install_statements.append(str("""subprocess.call(['pip', 'install','""" + package_name + "'])"))
@@ -182,12 +137,9 @@ def get_dependencies(code_segment_list, global_dict):
             else:
               match = re.search(r"'(.*)'", text)
               if match:
-                  # print("dependency module error here")
                   quoted_text = match.group(1)
-                  # print(quoted_text)
                   dep_modules.append(quoted_text)
                   bool_val = False
-      # print("bool val: ", bool_val)
     return dep_modules
 
 def copy_files():
@@ -209,22 +161,16 @@ def run_loop(environment_list, code_list, tree_dict, global_dict):
   code_segment_list = None
   for i in range(20):
     code_segment_list = environment_list + code_list 
-    # print("code_segment_list: ", code_segment_list)
-    # print(i)
     dependencies = get_dependencies(code_segment_list, global_dict)
-    # print("dependencies: ", dependencies)
     if len(dependencies) == 0:
       break
     for dependency in dependencies:
-      # print("dependency: ", dependency)
       code = tree_dict[dependency]
-      # print("dependency parent_dependency: ", parent_dependency)
       code_list.insert(0, code)
   return code_segment_list
 
 
 def save_requirements(path, requirements):
-  # print("reaches save requirements")
   subprocess.run(["pipreqs", "--mode", "no-pin", path])
   with open('./berri_files/requirements.txt', 'r') as f:
     existing_reqs = f.readlines()
@@ -238,7 +184,6 @@ def save_requirements(path, requirements):
           if tmp_req not in existing_reqs:
               f.write(tmp_req + '\n')
           else:
-              # print(f"{tmp_req} is already in requirements.txt")
               continue
 
 def get_requirements(line):
@@ -263,27 +208,6 @@ def install_requirements():
     install_statements.append(str("""subprocess.call(['pip', 'install','""" + package_name + "'])"))
     for install_statement in install_statements:
       exec(install_statement)
-
-# def read_file_copy_drive_files(line):
-#   # Check if the line contains a path to a file or folder
-#   path = re.search(r'"([^"]*drive[^"]*)"', line)
-#   if path: 
-#       if os.path.exists(path.group(1)):
-#         # Copy the file/folder to the berri_files folder
-#         new_filepath = None
-#         if os.path.isdir(path.group(1)):
-#           for file in os.listdir(path.group(1)): 
-#             shutil.copy(os.path.join(path.group(1), file), 'berri_files')
-#             new_filepath = file
-#         else:
-#             shutil.copy(path.group(1), 'berri_files')
-#             new_filepath = file
-#         # Update the line with the new filepath
-#         if new_filepath:
-#           line = re.sub(r'"([^"]*)"', '"' + new_filepath + '"', line)     
-#   return line 
-
-
 
 def docQAPipeline(user_email: str, openai_ai_key: str, input_url_or_list: Union[str, List[str]], language: Optional[str] = None):
   from gpt_index import SimpleWebPageReader, GPTSimpleVectorIndex, PromptHelper
@@ -310,7 +234,7 @@ def docQAPipeline(user_email: str, openai_ai_key: str, input_url_or_list: Union[
       # set maximum chunk overlap
       max_chunk_overlap = 20
       prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
-      documents = SimpleWebPageReader(html_to_text=True).load_data([input_url])
+      documents = SimpleWebPageReader(html_to_text=True).load_data([input_url_or_list])
       index = GPTSimpleVectorIndex(documents, prompt_helper=prompt_helper)
       if not os.path.exists('./berri_files/'):
         os.mkdir("./berri_files/")
@@ -503,16 +427,20 @@ def deploy_gpt_index(user_email: str):
       if ".query(" in line:
         # print("line where query was found: ", line)
         # get the variable name
+        print("line: ", line)
         if "=" in line:
-          initialization_line = line.split("=", 1)
+          initialization_line = line.split("=", 1)[1]
         else:
           initialization_line = line
+        print("initialization_line: ", initialization_line)
         # print("original_agent_name: ", original_agent_name)
         # replace with new name 
-        prev_name = initialization_line[1].split(".query")[0].strip()
+        prev_name = initialization_line.split(".query")[0].strip()
+        print("prev_name: ", prev_name)
         reinitialize_agent = "agent = " + prev_name
         f.write(reinitialize_agent + "\n")
-        line = initialization_line[1].replace(prev_name, "agent").strip()
+        line = initialization_line.replace(prev_name, "agent").strip()
+        print("new line: ", line)
         # print(initialization_line)
         f.write(line + "\n")
       else:
@@ -725,7 +653,7 @@ def deploy(user_email: str):
     try:
       mp.track(str(uuid.uuid4()), "package.error.berri.deploy()", {
         'UserEmail': user_email,
-        'Error': traceback.print_exc()
+        'Error': e
       })
     except:
       print("MP error")
