@@ -1,4 +1,4 @@
-__version__ = '0.16.7'
+__version__ = '0.17.0'
 import ast 
 import re
 import os 
@@ -146,7 +146,7 @@ def copy_files():
   current_directory = os.getcwd()
   if not os.path.exists(current_directory + '/berri_files'):
       os.mkdir(current_directory + '/berri_files')
-  list_of_restricted_dirs = ['berri_files', 'sample_data', 'drive', '.config', '__pycache__', '.ipynb_checkpoints']
+  list_of_restricted_dirs = ['berri_files', 'sample_data', 'drive', '.config', '__pycache__', '.ipynb_checkpoints', '.modules']
   for subdir, dirs, files in os.walk(current_directory):
     for file in files:
       if (file != 'sample_data' and file != 'drive') and (subdir == current_directory):
@@ -260,9 +260,9 @@ def docQAPipeline(user_email: str, openai_ai_key: str, input_url_or_list: Union[
     traceback.print_exc()
     print("🚨🚨 Deployment Error 📣: There was an error deploying your project. Join us on Discord (https://discord.gg/KvG3azf39U) and we'll fix this for you.")
     try:
-      mp.track(str(uuid.uuid4()), "package.error.berri.gpt_index_deploy()", {
+      mp.track(str(uuid.uuid4()), "package.error.berri.docqa_pipeline_deploy()", {
         'UserEmail': user_email,
-        'Error': traceback.print_exc()
+        'Error': e
       })
     except:
       print("MP error")
@@ -379,9 +379,9 @@ def deploy_func(user_email: str, executing_function, test_str: str):
     traceback.print_exc()
     print("🚨🚨 Deployment Error 📣: There was an error deploying your project. Join us on Discord (https://discord.gg/KvG3azf39U) and we'll fix this for you.")
     try:
-      mp.track(str(uuid.uuid4()), "package.error.berri.gpt_index_deploy()", {
+      mp.track(str(uuid.uuid4()), "package.error.berri.wrapper_func_deploy()", {
         'UserEmail': user_email,
-        'Error': traceback.print_exc()
+        'Error': e
       })
     except:
       print("MP error")
@@ -517,7 +517,7 @@ def deploy_gpt_index(user_email: str):
     try:
       mp.track(str(uuid.uuid4()), "package.error.berri.gpt_index_deploy()", {
         'UserEmail': user_email,
-        'Error': traceback.print_exc()
+        'Error': e
       })
     except:
       print("MP error")
