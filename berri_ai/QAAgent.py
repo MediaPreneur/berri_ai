@@ -4,7 +4,6 @@ import re
 import os
 from langchain.agents import initialize_agent, Tool, ZeroShotAgent, AgentExecutor
 from typing import Any, List, Optional, Tuple, Union
-os.environ["OPENAI_API_KEY"] = "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"
 
 class QAAgent(ZeroShotAgent):
   """Agent for the MRKL chain."""
