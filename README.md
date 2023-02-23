@@ -52,13 +52,13 @@ Today we support 2 pipelines:
    pip install berri-ai
    ```
 
-2. Import the deploy method:
+2. Import the ComplexInformationQA method:
 
    ```
    from berri_ai.ComplexInformationQA import ComplexInformationQA
    ```
 
-3. Initiate the deployment by providing your email address:
+3. Initiate the Complex Information Agent by providing your stored vector-index:
    ```
    index = GPTSimpleVectorIndex.load_from_disk("./doc_qa.json")
    CIQAgent = ComplexInformationQA(index)
