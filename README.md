@@ -17,7 +17,7 @@ There are 5 major ways you can use Berri
 2. GPT-Index: If you're writing an LLM app with the primary method of interaction being gpt-index's .query() function.
 3. Langchain: If you're writing an LLM app with the primary method of interaction being Langchain's 'initialize_agent' or 'AgentExecutor()' functions
 4. Wrapper functions: For more complex use-cases. If you're taking a user query and doing multiple things (LLM calls, api calls, etc.) with it, you can put them in a wrapper function and pass the wrapper function to Berri.
-5.
+5. Search Strategies: Improve search results for LLM agents.
 
 ### 👷 Pipelines
 
@@ -58,14 +58,40 @@ Today we support 2 pipelines:
    from berri_ai.ComplexInformationQA import ComplexInformationQA
    ```
 
-3. Initiate the Complex Information Agent by providing your stored vector-index:
-   ```
-   index = GPTSimpleVectorIndex.load_from_disk("./doc_qa.json")
-   CIQAgent = ComplexInformationQA(index)
-   response = CIQAgent.run("my order didn't arrive, even though I'd paid for express shipping")
-   ```
-   Note: you will need to initialize your environment with your openai key (`os.environ["OPENAI_API_KEY"] = <openai_api_key>`)
-   go [here](https://help.openai.com/en/articles/4936850-where-do-i-find-my-secret-api-key) to get your openai api key
+3. There are 2 ways to initialize a Complex Information Agent:
+
+Before we go into the approaches, let's see how to initialize a CIQ Agent:
+
+To initialize the CIQ Agent class, you will need to provide the following parameters:
+
+- model_key: This is the API key used to access the OpenAI API.
+- index: This is an optional parameter used to provide an index for the knowledgebase.
+- prompt: This is an optional parameter used to provide a prompt for the agent.
+- functions: This is a list of functions to be used by the agent (optional if you're passing an index).
+- descriptions: This is a list of descriptions for each function in the list (optional if you're passing an index).
+
+Sample Usage:
+
+- **Default**: Initiate the Complex Information Agent by providing your stored vector-index:
+
+  ```
+  index = GPTSimpleVectorIndex.load_from_disk("./doc_qa.json")
+  CIQAgent = ComplexInformationQA(index)
+  response = CIQAgent.run("my order didn't arrive, even though I'd paid for express shipping")
+  ```
+
+  Note: you will need to initialize your environment with your openai key (`os.environ["OPENAI_API_KEY"] = <openai_api_key>`)
+  go [here](https://help.openai.com/en/articles/4936850-where-do-i-find-my-secret-api-key) to get your openai api key
+
+- **Custom Tools**: Pass your own tools to an agent
+  ```
+  functions = [search, noneInput]
+  descriptions = ["This is the knowledge base to query. Only use keywords while querying this database. Do not use full sentences.", "This function takes a none input and returns a none output"]
+  CIQAgent = ComplexInformationQA(<openai_api_key>, None, None, functions, descriptions)
+  response = CIQAgent.run(user_input)
+  ```
+  Note: you will need to initialize your environment with your openai key (`os.environ["OPENAI_API_KEY"] = <openai_api_key>`)
+  go [here](https://help.openai.com/en/articles/4936850-where-do-i-find-my-secret-api-key) to get your openai api key
 
 ### GPT-Index
 
