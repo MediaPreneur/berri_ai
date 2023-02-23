@@ -1,4 +1,4 @@
-__version__ = '0.17.3'
+__version__ = '0.17.9'
 import ast 
 import re
 import os 
@@ -10,7 +10,6 @@ import requests
 import shutil
 from mixpanel import Mixpanel
 import uuid
-from berri_ai.DocStore import DocStore 
 from typing import Union, List, Optional
 import json 
 
@@ -31,6 +30,19 @@ def send_files(user_email, template_name):
 
 def traverse_ast(tree_dict, code, tree, global_dict):
   for node in tree.body:
+      if isinstance(node, ast.For):
+          node_value_source = ast.get_source_segment(code, node)
+          for child in node.body: 
+            if isinstance(child, ast.Assign):
+              value_source = ast.get_source_segment(code, child)
+              str_split = value_source.split("=", 1)
+              key_val = str(str_split[0]).strip()
+              if key_val in tree_dict: 
+                if node_value_source == tree_dict[key_val]:
+                  continue
+                else:
+                  raise KeyError("🚨🚨 Deployment Error 📣: The variable - " + key_val + ' has been initialized 2 times. Here are the instances: \n 1.' + tree_dict[key_val][:100] + '\n 2.' + value_source[:100])
+              tree_dict[key_val] = node_value_source
       if isinstance(node, ast.With):
         node_value_source = ast.get_source_segment(code, node)
         for child in node.body: 
@@ -38,23 +50,28 @@ def traverse_ast(tree_dict, code, tree, global_dict):
             value_source = ast.get_source_segment(code, child)
             str_split = value_source.split("=", 1)
             key_val = str(str_split[0]).strip()
-            if key_val in tree_dict: 
-              if node_value_source == tree_dict[key_val]:
-                continue
-              else:
-                raise KeyError("🚨🚨 Deployment Error 📣: The variable - " + key_val + ' has been initialized 2 times. Here are the instances: \n 1.' + tree_dict[key_val][:100] + '\n 2.' + value_source[:100])
-            tree_dict[key_val] = node_value_source
+            key_val = key_val.split(",") # if there's multiple items being assigned on the same line
+            for kv in key_val:
+              kv = kv.strip()
+              if kv in tree_dict: 
+                if node_value_source == tree_dict[kv]:
+                  continue
+                else:
+                  raise KeyError("🚨🚨 Deployment Error 📣: The variable - " + kv + ' has been initialized 2 times. Here are the instances: \n 1.' + tree_dict[kv][:100] + '\n 2.' + value_source[:100])
+              tree_dict[kv] = node_value_source
       if isinstance(node, ast.Assign):
         value_source = ast.get_source_segment(code, node)
         str_split = value_source.split("=", 1)
         key_val = str(str_split[0]).strip()
-        value = str(str_split[1]).strip()
-        if key_val in tree_dict: 
-          if value_source == tree_dict[key_val]:
-            continue
-          else:
-            raise KeyError("🚨🚨 Deployment Error 📣: The variable - " + key_val + ' has been initialized 2 times. Here are the instances: \n 1.' + tree_dict[key_val][:100] + '\n 2.' + value_source[:100])
-        tree_dict[key_val] = value_source
+        key_val = key_val.split(",") # if there's multiple items being assigned on the same line
+        for kv in key_val:
+          kv = kv.strip()
+          if kv in tree_dict: 
+            if value_source == tree_dict[kv]:
+              continue
+            else:
+              raise KeyError("🚨🚨 Deployment Error 📣: The variable - " + kv + ' has been initialized 2 times. Here are the instances: \n 1.' + tree_dict[kv][:100] + '\n 2.' + value_source[:100])
+          tree_dict[kv] = value_source
       elif isinstance(node, ast.ClassDef):
           key_val = node.name.strip()
           if key_val in tree_dict: 
@@ -104,9 +121,12 @@ def get_dependencies(code_segment_list, global_dict):
       dep_modules = []
       try:
         for code_segment in code_segment_list:
+          print("code_segment being executed: ", code_segment)
           exec(code_segment, global_dict)
         bool_val = False
       except ModuleNotFoundError as e:
+        print(e)
+        traceback.print_exc()
         text = e.args[0]
         match = re.search(r"'(.*)'", text)
         if match:
@@ -118,6 +138,8 @@ def get_dependencies(code_segment_list, global_dict):
             for install_statement in install_statements:
               exec(install_statement)
       except Exception as e:
+        print(e)
+        traceback.print_exc()
         if hasattr(e, 'name'):
           dep_modules.append(e.name)  # Add module that caused error
           bool_val = False
@@ -140,6 +162,7 @@ def get_dependencies(code_segment_list, global_dict):
                   quoted_text = match.group(1)
                   dep_modules.append(quoted_text)
                   bool_val = False
+      print("bool_val: ", bool_val)
     return dep_modules
 
 def copy_files():
@@ -209,66 +232,6 @@ def install_requirements():
     for install_statement in install_statements:
       exec(install_statement)
 
-def docQAPipeline(user_email: str, openai_ai_key: str, input_url_or_list: Union[str, List[str]], language: Optional[str] = None):
-  from gpt_index import SimpleWebPageReader, GPTSimpleVectorIndex, PromptHelper
-  import os
-  try:
-    print("Begun deployment..")
-    print("🚨 Hit an error? let us know in the Discord (https://discord.gg/KvG3azf39U).")
-    print("🐍 Chunking + Vectorizing + Storing your url data, this might take 1-2 minutes.")
-
-    try:
-      mp.track(str(uuid.uuid4()), "package.start.berri.docQAPipeline()", {
-        'UserEmail': user_email
-      })
-    except:
-      print("MP error")
-
-    if isinstance(input_url_or_list, str):
-      # code to process single URL
-      os.environ["OPENAI_API_KEY"] = openai_ai_key
-      # set maximum input size
-      max_input_size = 4096
-      # set number of output tokens
-      num_output = 256
-      # set maximum chunk overlap
-      max_chunk_overlap = 20
-      prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
-      documents = SimpleWebPageReader(html_to_text=True).load_data([input_url_or_list])
-      index = GPTSimpleVectorIndex(documents, prompt_helper=prompt_helper)
-      if not os.path.exists('./berri_files/'):
-        os.mkdir("./berri_files/")
-      index.save_to_disk("./berri_files/doc_qa.json")
-    elif isinstance(input_url_or_list, list):
-      # code to process list of documents
-      documentsData = []
-      for item in input_url_or_list:
-        with open(item, "r") as f:
-          documentData = f.read()
-          documentsData.append(documentData)
-      if language == None:
-        raise RuntimeError(f"🚨🚨 Runtime Error 📣: need to specify if language in docs is 'english' or 'portugese' if you pass in a list of doc files")
-      DocStore(documentsData, language)
-      credentials = {"openai_api_key": openai_ai_key}
-      with open("./berri_files/credentials.json", "w") as f:
-        json.dump(credentials, f)
-    endpoint = "https://" + send_files(user_email, "berri_backend_pipeline_server_template")
-    print("🚧 Currently deploying to [NOT READY YET] 👉 " + endpoint)
-    print("⌛️ It'll be ready in 15 mins. We'll email you  @ " + user_email)
-  except Exception as e: 
-    print(e)
-    traceback.print_exc()
-    print("🚨🚨 Deployment Error 📣: There was an error deploying your project. Join us on Discord (https://discord.gg/KvG3azf39U) and we'll fix this for you.")
-    try:
-      mp.track(str(uuid.uuid4()), "package.error.berri.docqa_pipeline_deploy()", {
-        'UserEmail': user_email,
-        'Error': e
-      })
-    except:
-      print("MP error")
-  print("=====================")
-  print("Got feedback? Text/WhatsApp us 👉 +17708783106")
-
 
 def deploy_func(user_email: str, executing_function, test_str: str):
   from google.colab import _message
@@ -325,7 +288,7 @@ def deploy_func(user_email: str, executing_function, test_str: str):
     # traverse the file and create a dictionary
     traverse_ast(tree_dict, code, tree, global_dict)
     # print("global_dict: ", global_dict)
-    # print("tree_dict: ", tree_dict)
+    print("tree_dict: ", tree_dict)
 
 
     # set the executing line

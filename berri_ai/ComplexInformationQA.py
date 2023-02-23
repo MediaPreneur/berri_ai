@@ -1,4 +1,4 @@
-from gpt_index import GPTSimpleVectorIndex 
+from llama_index import GPTSimpleVectorIndex 
 from langchain import OpenAI, LLMChain
 from langchain.schema import AgentAction, AgentFinish
 import re
@@ -10,14 +10,22 @@ from berri_ai.QAAgent import QAAgent
 class ComplexInformationQA():
   """Base class for Complex Information QA Agent Class"""  
 
-  def __init__(self, index, prompt = None):
+  def __init__(self, openai_api_key, index = None, prompt = None, functions = None, descriptions = None):
+    os.environ["OPENAI_API_KEY"] = openai_api_key
     self.index = index 
-    tools = [
-      Tool(
-          name = "QueryingDB",
-          func=self.querying_db,
-          description="This function takes a query string as input and returns the most relevant answer from the documentation as output"
-      )]
+    if len(functions) > 0:
+      if len(functions) != len(descriptions):
+        raise ValueError("The number of functions does not match the number of descriptions!")
+      self.functions = functions 
+      self.descriptions = descriptions 
+      tools = self.define_tools()
+    else: 
+      tools = [
+        Tool(
+            name = "QueryingDB",
+            func=function,
+            description="This function takes a query string as input and returns the most relevant answer from the documentation as output"
+        )]
 
     PREFIX = """Answer the following questions as best you can. You have access to the following tools:"""
 
@@ -33,7 +41,28 @@ class ComplexInformationQA():
           input_variables=["input", "agent_scratchpad"])
     self.tools = tools
     self.llm_chain = LLMChain(llm=OpenAI(temperature=0), prompt=self.prompt)
+ 
   
+  def define_tools(self): 
+    agent_tools = []
+    for idx, function in enumerate(self.functions): 
+      # set tool name
+      tool_name = self.extract_function_names(function)
+      # set tool func
+      tool_func  = function
+      # initialize tool for the agent
+      agent_tool = Tool(name=tool_name, func=tool_func, description=self.descriptions[idx])
+      # add to list of tools
+      agent_tools.append(agent_tool)
+    return agent_tools
+
+  # define function that takes in a list of functions
+  def extract_function_names(self, function): 
+    # extract the name from the function
+    name = function.__name__ 
+    # append the name to the list
+    return name
+
   def querying_db(self, query: str):
     response = self.index.query(query)
     response = (response.response, response.source_nodes[0].source_text)
