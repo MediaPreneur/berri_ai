@@ -76,7 +76,7 @@ Sample Usage:
 
   ```
   index = GPTSimpleVectorIndex.load_from_disk("./doc_qa.json")
-  CIQAgent = ComplexInformationQA(index)
+  CIQAgent = ComplexInformationQA(<openai_api_key>, index)
   response = CIQAgent.run("my order didn't arrive, even though I'd paid for express shipping")
   ```
 
