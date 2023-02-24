@@ -41,10 +41,7 @@ class DocStore:
       return passages
       
     def tokenize_corpus(self):
-      tokenize_corpus = []
-      for passage in tqdm(self.passages):
-        tokenize_corpus.append(self.bm25_tokenizer(passage))
-      return tokenize_corpus
+        return [self.bm25_tokenizer(passage) for passage in tqdm(self.passages)]
 
     # We lower case our text and remove stop-words from indexing
     def bm25_tokenizer(self, text):
