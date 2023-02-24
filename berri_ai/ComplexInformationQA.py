@@ -58,10 +58,7 @@ class ComplexInformationQA():
 
   # define function that takes in a list of functions
   def extract_function_names(self, function): 
-    # extract the name from the function
-    name = function.__name__ 
-    # append the name to the list
-    return name
+    return function.__name__
 
   def querying_db(self, query: str):
     response = self.index.query(query)
@@ -72,5 +69,4 @@ class ComplexInformationQA():
     llm_chain = LLMChain(llm=OpenAI(temperature=0), prompt=self.prompt)
     agent2 = QAAgent(llm_chain=self.llm_chain, tools=self.tools)
     agent_executor = AgentExecutor.from_agent_and_tools(agent=agent2, tools=self.tools, verbose=True, return_intermediate_steps=True)
-    answer = agent_executor({"input":query_string})
-    return answer
+    return agent_executor({"input":query_string})
